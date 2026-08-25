@@ -50,10 +50,12 @@ import {
     CreateImageRequestSchema,
     CreateImageResponseSchema,
     GetModelsResponseSchema,
+    OpenAIModelSchema,
 } from "@shared/schemas/openai.ts";
 import { SafeSchema } from "@shared/schemas/safety.ts";
 import { errorResponseDescriptions } from "@shared/utils/api-docs.ts";
 import { createFactory } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
     CreateEmbeddingRequestSchema,
@@ -82,6 +84,10 @@ import {
     getGenerationModelRegistry,
 } from "../model-registry.ts";
 import { handleSimpleAudio } from "./audio.ts";
+import {
+    findRequestedEntry,
+    toModelEntry,
+} from "./model-entry.ts";
 import {
     generateChatCompletion,
     generateEmbeddingsResponse,
@@ -322,37 +328,48 @@ export const proxyRoutes = new Hono<Env>()
                 ),
                 community,
             );
-            const now = Date.now();
-
-            const toModelEntry = (entry: GenerationModelEntry) => ({
-                id: entry.info.name,
-                object: "model" as const,
-                created: now,
-                input_modalities: entry.info.input_modalities,
-                output_modalities: entry.info.output_modalities,
-                supported_endpoints: entry.supportedEndpoints,
-                ...(entry.info.agent && { agent: true }),
-                ...(entry.info.base_model && {
-                    base_model: entry.info.base_model,
-                }),
-                pricing: entry.info.pricing,
-                capabilities: entry.info.capabilities,
-                ...(entry.info.tools && { tools: entry.info.tools }),
-                ...(entry.info.reasoning && {
-                    reasoning: entry.info.reasoning,
-                }),
-                ...(entry.info.context_length && {
-                    context_length: entry.info.context_length,
-                }),
-                ...(entry.info.per_user_rpm !== undefined && {
-                    per_user_rpm: entry.info.per_user_rpm,
-                }),
-            });
 
             return c.json({
                 object: "list" as const,
                 data: modelEntries.map(toModelEntry),
             });
+        },
+    )
+    .get(
+        "/v1/models/:model",
+        describeRoute({
+            tags: ["🤖 Models"],
+            summary: "Retrieve Model (OpenAI-compatible)",
+            description:
+                'Returns a single available model in the same OpenAI-compatible shape as `GET /v1/models`. Model aliases resolve to the canonical model ID. Visibility, API key permission, community, and paid-balance rules match the list endpoint; missing or inaccessible models return 404.',
+            responses: {
+                200: {
+                    description: "Success",
+                    content: {
+                        "application/json": {
+                            schema: resolver(OpenAIModelSchema),
+                        },
+                    },
+                },
+                ...errorResponseDescriptions(404),
+            },
+        }),
+        async (c) => {
+            const requested = c.req.param("model");
+            const allowedModels = c.var.auth?.apiKey?.permissions?.models;
+            const paidBalance = hasPaidBalance(c);
+            const entries = filterEntriesByPermissions(
+                await getVisibleModelEntries(c),
+                allowedModels,
+                paidBalance,
+            );
+            const entry = findRequestedEntry(entries, requested);
+            if (!entry) {
+                throw new HTTPException(404, {
+                    message: `Model not found: ${requested}`,
+                });
+            }
+            return c.json(toModelEntry(entry));
         },
     )
     .get(
