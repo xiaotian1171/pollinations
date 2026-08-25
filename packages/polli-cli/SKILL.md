@@ -15,7 +15,7 @@ Install: `npm i -g @pollinations/cli@latest` (provides the `polli` binary).
 - User asks to **generate an image / text / audio / video** via pollinations
 - User mentions **polli, pollinations, pollen, pollinations.ai**
 - User wants to **transcribe speech** or run TTS
-- User asks about their **pollen balance, usage, or API keys**
+- User asks about their **pollen balance, usage, earnings, or API keys**
 - User wants to **browse or filter available models**
 - User wants to inspect **quests** or manage invite-only **my-models**
 - User wants to create or update a hosted prompt **agent**
@@ -39,6 +39,7 @@ Install: `npm i -g @pollinations/cli@latest` (provides the `polli` binary).
 | Filter models by type | `polli models --type image` |
 | Model health + latency | `polli models --stats` (default 60m, `--window <min>`) |
 | Check balance | `polli usage` |
+| Show developer earnings | `polli earnings` (window: `--days <1-90>`) |
 | List your quests + claim state | `polli quests` (filters: `--open --claimable --claimed --coming-soon`) |
 | Manage prompt agents | `polli agents list` |
 | Manage invite-only community models | `polli my-models list` |
