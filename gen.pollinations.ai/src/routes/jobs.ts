@@ -131,6 +131,7 @@ export const jobRoutes = new Hono<Env>()
                     message: "Job result is no longer available",
                 });
             }
+            response.headers.set("Cache-Control", "private, no-store");
             return response;
         },
     );
